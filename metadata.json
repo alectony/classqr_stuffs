@@ -1,0 +1,7 @@
+{
+  "name": "ClassQR Attendance & AWS Keeper",
+  "description": "Streamlined QR code attendance system for teachers and students featuring real-time QR scanning, Time In/Out logging, and LocalStack DynamoDB/S3 database record keeping.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
