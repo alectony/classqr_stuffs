@@ -318,7 +318,7 @@ export const QrProjectorModal: React.FC<QrProjectorModalProps> = ({
               <ul className="list-disc list-inside space-y-1.5 text-slate-400 pl-1">
                 <li>Students can open the scanner on their own phone using the <strong>Student App Link</strong> tab above.</li>
                 <li>Dynamic QR automatically refreshes token every 30 seconds to prevent forwarding photos.</li>
-                <li>Records are cryptographically hashed and mirrored to LocalStack / AWS DynamoDB & S3.</li>
+                <li>Records are cryptographically hashed and mirrored to LocalStack DynamoDB.</li>
               </ul>
             </div>
           </div>
