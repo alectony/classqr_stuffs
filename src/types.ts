@@ -37,6 +37,7 @@ export interface AttendanceRecord {
   awsSyncStatus: 'synced_live' | 'vault_stored' | 'pending';
   awsRecordKey?: string;
   s3ArchiveKey?: string;
+  hash?: string;
   deviceInfo?: string;
   createdAt: string;
   updatedAt: string;

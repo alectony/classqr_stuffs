@@ -21,6 +21,7 @@ import {
 import jsQR from "jsqr";
 import confetti from "canvas-confetti";
 import { Session, AttendanceRecord, Student } from "../types";
+import { DataService } from "../lib/dataService";
 
 interface StudentScannerProps {
   sessions: Session[];
@@ -251,47 +252,38 @@ export const StudentScanner: React.FC<StudentScannerProps> = ({
     const token = parsedPayload.token;
 
     try {
-      const res = await fetch("/api/attendance/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId,
-          sessionCode,
-          token,
-          studentId,
-          studentName,
-          section,
-          actionType,
-          method,
-        }),
+      const data = await DataService.processScan({
+        sessionId,
+        sessionCode,
+        token,
+        studentId,
+        studentName,
+        section,
+        actionType,
+        method,
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setScanErrorMessage(data.error || "Failed to log attendance record.");
-      } else {
-        setScanSuccessResult({
-          record: data.record,
-          message: data.message,
-          action: data.action,
+      setScanSuccessResult({
+        record: data.record,
+        message: data.message,
+        action: data.action,
+      });
+
+      // Trigger confetti celebration
+      try {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ["#10b981", "#6366f1", "#f59e0b", "#3b82f6"],
         });
-
-        // Trigger confetti celebration
-        try {
-          confetti({
-            particleCount: 80,
-            spread: 70,
-            origin: { y: 0.6 },
-            colors: ["#10b981", "#6366f1", "#f59e0b", "#3b82f6"],
-          });
-        } catch (e) {
-          // ignore if confetti fails
-        }
-
-        onRefreshData();
+      } catch (e) {
+        // ignore if confetti fails
       }
+
+      onRefreshData();
     } catch (err: any) {
-      setScanErrorMessage(`Network error: ${err.message}`);
+      setScanErrorMessage(err.message || "Failed to log attendance record.");
     } finally {
       setIsProcessing(false);
     }

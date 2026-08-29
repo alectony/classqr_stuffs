@@ -13,6 +13,7 @@ import {
   PlayCircle
 } from "lucide-react";
 import { AwsVaultStatus, Session } from "../types";
+import { DataService } from "../lib/dataService";
 
 interface AwsRecordVaultProps {
   awsStatus: AwsVaultStatus | null;
@@ -25,10 +26,11 @@ export const AwsRecordVault: React.FC<AwsRecordVaultProps> = ({
   activeSession,
   onRefreshData,
 }) => {
-  const [activeTab, setActiveTab] = useState<"localstack" | "dynamodb">("localstack");
+  const [activeTab, setActiveTab] = useState<"localstack" | "dynamodb" | "backup">("localstack");
   const [dynamoRecords, setDynamoRecords] = useState<any[]>([]);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [importMessage, setImportMessage] = useState<{ success: boolean; text: string } | null>(null);
 
   // LocalStack custom endpoint state
   const [localstackEndpoint, setLocalstackEndpoint] = useState<string>(
@@ -44,8 +46,7 @@ export const AwsRecordVault: React.FC<AwsRecordVaultProps> = ({
 
   const fetchRecords = async () => {
     try {
-      const dRes = await fetch("/api/aws/dynamodb-records");
-      const dData = await dRes.json();
+      const dData = await DataService.getDynamoRecords();
       setDynamoRecords(Array.isArray(dData) ? dData : []);
     } catch (e) {
       console.error("Failed to fetch database records:", e);
@@ -61,8 +62,7 @@ export const AwsRecordVault: React.FC<AwsRecordVaultProps> = ({
     setIsSyncing(true);
     setSyncMessage(null);
     try {
-      const res = await fetch(`/api/aws/sync/${activeSession.id}`, { method: "POST" });
-      const data = await res.json();
+      const data = await DataService.syncSessionToAws(activeSession.id);
       setSyncMessage(data.message || "Sync completed successfully.");
       onRefreshData();
       fetchRecords();
@@ -77,12 +77,7 @@ export const AwsRecordVault: React.FC<AwsRecordVaultProps> = ({
     setIsProvisioning(true);
     setProvisionResult(null);
     try {
-      const res = await fetch("/api/aws/localstack/provision", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: localstackEndpoint }),
-      });
-      const data = await res.json();
+      const data = await DataService.provisionLocalStack(localstackEndpoint);
       setProvisionResult(data);
       onRefreshData();
       fetchRecords();
@@ -235,6 +230,18 @@ export const AwsRecordVault: React.FC<AwsRecordVaultProps> = ({
         >
           <HardDrive className="w-4 h-4 text-orange-400" />
           <span>DynamoDB Items ({dynamoRecords.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("backup")}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all text-xs sm:text-sm ${
+            activeTab === "backup"
+              ? "bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-600/30 ring-1 ring-white/20"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"
+          }`}
+        >
+          <Activity className="w-4 h-4 text-cyan-400" />
+          <span>GitHub Pages & Backups</span>
         </button>
       </div>
 
@@ -487,6 +494,153 @@ export const AwsRecordVault: React.FC<AwsRecordVaultProps> = ({
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {/* TAB 2: GitHub Pages & Backups */}
+      {activeTab === "backup" && (
+        <div className="space-y-6">
+          <div className="bg-slate-900/40 backdrop-blur-xl border border-white/10 rounded-[28px] p-6 sm:p-7 shadow-2xl space-y-6">
+            <div>
+              <h2 className="text-lg sm:text-xl font-extrabold text-white flex items-center space-x-2">
+                <Activity className="w-5 h-5 text-cyan-400" />
+                <span>GitHub Pages & Offline Persistence</span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                ClassQR is built with a dual-engine architecture: when hosted as a static site on GitHub Pages, data is securely persisted in your browser's local storage and can be backed up or restored anytime.
+              </p>
+            </div>
+
+            {importMessage && (
+              <div
+                className={`p-4 rounded-2xl border text-xs flex items-center space-x-2 ${
+                  importMessage.success
+                    ? "bg-emerald-950/60 border-emerald-500/30 text-emerald-300"
+                    : "bg-red-950/60 border-red-500/30 text-red-300"
+                }`}
+              >
+                {importMessage.success ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                )}
+                <span>{importMessage.text}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Export Data */}
+              <div className="bg-slate-950/60 border border-white/10 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                <div>
+                  <h3 className="font-bold text-white text-sm flex items-center space-x-2">
+                    <Database className="w-4 h-4 text-indigo-400" />
+                    <span>Export JSON Backup</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                    Download all classroom sessions, attendance logs, and student rosters as a single portable JSON file.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    const dataStr = DataService.exportAllData();
+                    const blob = new Blob([dataStr], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `classqr_backup_${new Date().toISOString().split("T")[0]}.json`;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/30"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Download Backup (.json)</span>
+                </button>
+              </div>
+
+              {/* Import Data */}
+              <div className="bg-slate-950/60 border border-white/10 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                <div>
+                  <h3 className="font-bold text-white text-sm flex items-center space-x-2">
+                    <RefreshCw className="w-4 h-4 text-emerald-400" />
+                    <span>Import JSON Backup</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                    Restore sessions, attendance records, and student rosters from an exported JSON file.
+                  </p>
+                </div>
+                <label className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-lg shadow-emerald-600/30 cursor-pointer">
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>Upload & Restore Backup</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        try {
+                          const jsonStr = event.target?.result as string;
+                          const res = DataService.importAllData(jsonStr);
+                          setImportMessage(res);
+                          if (res.success) {
+                            onRefreshData();
+                            fetchRecords();
+                          }
+                        } catch (err: any) {
+                          setImportMessage({ success: false, text: `Error reading file: ${err.message}` });
+                        }
+                      };
+                      reader.readAsText(file);
+                    }}
+                  />
+                </label>
+              </div>
+
+              {/* Reset to Seed Data */}
+              <div className="bg-slate-950/60 border border-white/10 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                <div>
+                  <h3 className="font-bold text-white text-sm flex items-center space-x-2">
+                    <HardDrive className="w-4 h-4 text-amber-400" />
+                    <span>Reset to Seed Roster</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                    Reset local database to initial sample data with demo students, subjects, and QR tokens.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (confirm("Reset all local sessions and records to the default demo data?")) {
+                      localStorage.clear();
+                      window.location.reload();
+                    }
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-white/10 transition-all"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Reset Demo State</span>
+                </button>
+              </div>
+            </div>
+
+            {/* GitHub Pages Deployment Guide */}
+            <div className="bg-slate-950/80 border border-white/10 rounded-2xl p-5 space-y-4">
+              <h3 className="font-extrabold text-white text-sm flex items-center space-x-2">
+                <Terminal className="w-4 h-4 text-indigo-400" />
+                <span>How to Deploy to GitHub Pages</span>
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                A pre-configured GitHub Actions workflow (<code className="text-indigo-300 font-mono">.github/workflows/deploy.yml</code>) has been placed in your repository root. Follow these simple steps:
+              </p>
+              <ol className="list-decimal list-inside space-y-2 text-xs text-slate-300 leading-relaxed font-sans pl-1">
+                <li>Push your repository to GitHub: <code className="text-indigo-300 font-mono bg-white/5 px-2 py-0.5 rounded">git push origin main</code></li>
+                <li>Go to your repository settings on GitHub: <strong>Settings &rarr; Pages</strong>.</li>
+                <li>Under <strong>Build and deployment &rarr; Source</strong>, choose <strong>GitHub Actions</strong>.</li>
+                <li>The automated action will build the static Vite bundle and deploy your ClassQR site within 1-2 minutes!</li>
+              </ol>
+            </div>
           </div>
         </div>
       )}

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import QRCode from "qrcode";
 import { Session, AttendanceRecord } from "../types";
+import { DataService } from "../lib/dataService";
 
 interface QrProjectorModalProps {
   session: Session | null;
@@ -48,8 +49,7 @@ export const QrProjectorModal: React.FC<QrProjectorModalProps> = ({
   const fetchAndRenderQr = async () => {
     if (!session) return;
     try {
-      const res = await fetch(`/api/sessions/${session.id}/qr-token`);
-      const data = await res.json();
+      const data = await DataService.getQrToken(session.id);
       if (data.qrPayload) {
         const url = await QRCode.toDataURL(data.qrPayload, {
           width: 500,

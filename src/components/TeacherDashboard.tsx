@@ -22,6 +22,7 @@ import {
   UserPlus
 } from "lucide-react";
 import { Session, AttendanceRecord, Student, AttendanceStatus } from "../types";
+import { DataService } from "../lib/dataService";
 
 interface TeacherDashboardProps {
   sessions: Session[];
@@ -101,28 +102,21 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     if (!newSubject.trim()) return;
 
     try {
-      const res = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subject: newSubject,
-          teacherName: newTeacherName,
-          room: newRoom,
-          startTime: newStartTime,
-          endTime: newEndTime,
-          gracePeriodMins: newGracePeriod,
-          dynamicQr: newDynamicQr,
-          totalStudentsExpected: newExpectedStudents,
-          allowedMode: "both",
-        }),
+      const created = await DataService.createSession({
+        subject: newSubject,
+        teacherName: newTeacherName,
+        room: newRoom,
+        startTime: newStartTime,
+        endTime: newEndTime,
+        gracePeriodMins: newGracePeriod,
+        dynamicQr: newDynamicQr,
+        totalStudentsExpected: newExpectedStudents,
+        allowedMode: "both",
       });
-      if (res.ok) {
-        const created = await res.json();
-        setActiveSession(created);
-        setIsCreatingSession(false);
-        setNewSubject("");
-        onRefreshData();
-      }
+      setActiveSession(created);
+      setIsCreatingSession(false);
+      setNewSubject("");
+      onRefreshData();
     } catch (err) {
       console.error("Failed to create session:", err);
     }
@@ -149,27 +143,21 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     if (!sId || !sName) return;
 
     try {
-      const res = await fetch("/api/attendance/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: activeSession.id,
-          sessionCode: activeSession.code,
-          studentId: sId,
-          studentName: sName,
-          section: sSection,
-          actionType: manualAction,
-          method: "teacher_override",
-          notes: "Manual check-in by instructor",
-        }),
+      await DataService.processScan({
+        sessionId: activeSession.id,
+        sessionCode: activeSession.code,
+        studentId: sId,
+        studentName: sName,
+        section: sSection,
+        actionType: manualAction,
+        method: "teacher_override",
+        notes: "Manual check-in by instructor",
       });
-      if (res.ok) {
-        setIsManualAddOpen(false);
-        setSelectedStudentId("");
-        setCustomStudentId("");
-        setCustomStudentName("");
-        onRefreshData();
-      }
+      setIsManualAddOpen(false);
+      setSelectedStudentId("");
+      setCustomStudentId("");
+      setCustomStudentName("");
+      onRefreshData();
     } catch (err) {
       console.error("Manual add failed:", err);
     }
@@ -178,11 +166,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   // Handle Record Status Update
   const handleUpdateRecordStatus = async (recordId: string, newStatus: AttendanceStatus, notes?: string) => {
     try {
-      await fetch(`/api/attendance/${recordId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus, notes }),
-      });
+      await DataService.updateAttendanceStatus(recordId, newStatus, notes);
       setEditingRecord(null);
       onRefreshData();
     } catch (e) {
@@ -194,7 +178,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const handleDeleteRecord = async (recordId: string) => {
     if (!confirm("Are you sure you want to remove this attendance record?")) return;
     try {
-      await fetch(`/api/attendance/${recordId}`, { method: "DELETE" });
+      await DataService.deleteAttendanceRecord(recordId);
       onRefreshData();
     } catch (e) {
       console.error("Delete error:", e);

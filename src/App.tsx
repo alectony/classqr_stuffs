@@ -6,6 +6,7 @@ import { AwsRecordVault } from "./components/AwsRecordVault";
 import { QrProjectorModal } from "./components/QrProjectorModal";
 import { StudentShareModal } from "./components/StudentShareModal";
 import { Session, AttendanceRecord, Student, AwsVaultStatus } from "./types";
+import { DataService } from "./lib/dataService";
 import { RefreshCw, ExternalLink, ShieldCheck, Smartphone, GraduationCap, ArrowRight } from "lucide-react";
 
 export function App() {
@@ -53,20 +54,15 @@ export function App() {
     }
   };
 
-  // Fetch all initial data from backend
+  // Fetch all initial data using DataService
   const loadData = async () => {
     try {
-      const [sessRes, recRes, stuRes, awsRes] = await Promise.all([
-        fetch("/api/sessions"),
-        fetch("/api/attendance"),
-        fetch("/api/students"),
-        fetch("/api/aws/status"),
+      const [sessData, recData, stuData, awsData] = await Promise.all([
+        DataService.getSessions(),
+        DataService.getAttendance(),
+        DataService.getStudents(),
+        DataService.getAwsStatus(),
       ]);
-
-      const sessData = await sessRes.json();
-      const recData = await recRes.json();
-      const stuData = await stuRes.json();
-      const awsData = await awsRes.json();
 
       setSessions(sessData || []);
       setRecords(recData || []);
@@ -81,7 +77,7 @@ export function App() {
         if (updated) setActiveSession(updated);
       }
     } catch (e) {
-      console.error("Failed to load initial application state:", e);
+      console.error("Failed to load application state:", e);
     } finally {
       setIsLoading(false);
     }
@@ -100,7 +96,7 @@ export function App() {
 
   const handleSyncAws = async (sessionId: string) => {
     try {
-      await fetch(`/api/aws/sync/${sessionId}`, { method: "POST" });
+      await DataService.syncSessionToAws(sessionId);
       loadData();
     } catch (e) {
       console.error("Sync error:", e);
