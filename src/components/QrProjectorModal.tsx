@@ -1,5 +1,20 @@
 import React, { useState, useEffect } from "react";
-import { X, Maximize2, Minimize2, RefreshCw, Users, ShieldCheck, Clock, Volume2, VolumeX, Sparkles, CheckCircle2 } from "lucide-react";
+import {
+  X,
+  Maximize2,
+  Minimize2,
+  RefreshCw,
+  Users,
+  ShieldCheck,
+  Clock,
+  Volume2,
+  VolumeX,
+  Sparkles,
+  CheckCircle2,
+  Smartphone,
+  QrCode as QrCodeIcon,
+  ExternalLink
+} from "lucide-react";
 import QRCode from "qrcode";
 import { Session, AttendanceRecord } from "../types";
 
@@ -17,6 +32,8 @@ export const QrProjectorModal: React.FC<QrProjectorModalProps> = ({
   onClose,
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
+  const [studentAppQrUrl, setStudentAppQrUrl] = useState<string>("");
+  const [displayMode, setDisplayMode] = useState<"attendance_qr" | "student_app_qr">("attendance_qr");
   const [secondsRemaining, setSecondsRemaining] = useState<number>(30);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
@@ -55,6 +72,20 @@ export const QrProjectorModal: React.FC<QrProjectorModalProps> = ({
   useEffect(() => {
     if (!isOpen || !session) return;
     fetchAndRenderQr();
+
+    // Also generate Student App URL QR code
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    const appUrl = `${origin}${pathname}?app=student`;
+    QRCode.toDataURL(appUrl, {
+      width: 500,
+      margin: 2,
+      color: {
+        dark: "#090d16",
+        light: "#ffffff",
+      },
+      errorCorrectionLevel: "H",
+    }).then(setStudentAppQrUrl).catch(console.error);
 
     const timer = setInterval(() => {
       setSecondsRemaining((prev) => {
@@ -112,6 +143,31 @@ export const QrProjectorModal: React.FC<QrProjectorModalProps> = ({
           </div>
 
           <div className="flex items-center space-x-2">
+            {/* Toggle between Attendance QR vs Student App Link QR */}
+            <div className="flex items-center bg-slate-900/80 p-1 rounded-xl border border-white/10">
+              <button
+                onClick={() => setDisplayMode("attendance_qr")}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                  displayMode === "attendance_qr"
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Attendance QR
+              </button>
+              <button
+                onClick={() => setDisplayMode("student_app_qr")}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all flex items-center space-x-1 ${
+                  displayMode === "student_app_qr"
+                    ? "bg-emerald-600 text-white shadow-md"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <Smartphone className="w-3 h-3" />
+                <span>Student App Link</span>
+              </button>
+            </div>
+
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
               className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-white/10 transition-colors"
@@ -140,34 +196,63 @@ export const QrProjectorModal: React.FC<QrProjectorModalProps> = ({
         <div className="p-6 md:p-8 lg:p-10 grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
           {/* QR Code Presentation Box */}
           <div className="md:col-span-6 flex flex-col items-center justify-center">
-            <div className="relative p-5 bg-white rounded-3xl shadow-2xl shadow-indigo-500/20 border-4 border-indigo-500/40">
-              {qrDataUrl ? (
-                <img
-                  src={qrDataUrl}
-                  alt="Classroom QR Code"
-                  className="w-64 h-64 sm:w-72 sm:h-72 object-contain rounded-2xl"
-                />
-              ) : (
-                <div className="w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center text-slate-400">
-                  <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
+            {displayMode === "attendance_qr" ? (
+              <>
+                <div className="relative p-5 bg-white rounded-3xl shadow-2xl shadow-indigo-500/20 border-4 border-indigo-500/40">
+                  {qrDataUrl ? (
+                    <img
+                      src={qrDataUrl}
+                      alt="Classroom QR Code"
+                      className="w-64 h-64 sm:w-72 sm:h-72 object-contain rounded-2xl"
+                    />
+                  ) : (
+                    <div className="w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center text-slate-400">
+                      <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
+                    </div>
+                  )}
+
+                  {/* Rotating Token Badge */}
+                  <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-950 text-slate-200 text-xs font-semibold px-4 py-1.5 rounded-full border border-white/15 shadow-xl flex items-center space-x-2 whitespace-nowrap">
+                    <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                    <span>Anti-Proxy Token: rotates in</span>
+                    <span className="font-mono text-indigo-300 font-extrabold">{secondsRemaining}s</span>
+                  </div>
                 </div>
-              )}
 
-              {/* Rotating Token Badge */}
-              <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-950 text-slate-200 text-xs font-semibold px-4 py-1.5 rounded-full border border-white/15 shadow-xl flex items-center space-x-2 whitespace-nowrap">
-                <ShieldCheck className="w-4 h-4 text-indigo-400" />
-                <span>Anti-Proxy Token: rotates in</span>
-                <span className="font-mono text-indigo-300 font-extrabold">{secondsRemaining}s</span>
-              </div>
-            </div>
+                {/* Progress bar */}
+                <div className="w-64 sm:w-72 mt-7 bg-slate-950/80 border border-white/10 h-2 rounded-full overflow-hidden p-0.5">
+                  <div
+                    className="bg-gradient-to-r from-indigo-500 to-indigo-400 h-full rounded-full transition-all duration-1000 ease-linear shadow-sm"
+                    style={{ width: `${(secondsRemaining / 30) * 100}%` }}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="relative p-5 bg-white rounded-3xl shadow-2xl shadow-emerald-500/20 border-4 border-emerald-500/40">
+                  {studentAppQrUrl ? (
+                    <img
+                      src={studentAppQrUrl}
+                      alt="Student App Link QR"
+                      className="w-64 h-64 sm:w-72 sm:h-72 object-contain rounded-2xl"
+                    />
+                  ) : (
+                    <div className="w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center text-slate-400">
+                      <RefreshCw className="w-8 h-8 animate-spin text-emerald-500" />
+                    </div>
+                  )}
 
-            {/* Progress bar */}
-            <div className="w-64 sm:w-72 mt-7 bg-slate-950/80 border border-white/10 h-2 rounded-full overflow-hidden p-0.5">
-              <div
-                className="bg-gradient-to-r from-indigo-500 to-indigo-400 h-full rounded-full transition-all duration-1000 ease-linear shadow-sm"
-                style={{ width: `${(secondsRemaining / 30) * 100}%` }}
-              />
-            </div>
+                  <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 bg-emerald-950 text-emerald-200 text-xs font-semibold px-4 py-1.5 rounded-full border border-emerald-500/30 shadow-xl flex items-center space-x-2 whitespace-nowrap">
+                    <Smartphone className="w-4 h-4 text-emerald-400" />
+                    <span>Scan with Phone Camera to Open App</span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-400 text-center mt-6">
+                  Points directly to: <span className="font-mono text-emerald-300 font-semibold">{window.location.origin}/?app=student</span>
+                </p>
+              </>
+            )}
           </div>
 
           {/* Session Details & Live Ticker */}
@@ -180,9 +265,18 @@ export const QrProjectorModal: React.FC<QrProjectorModalProps> = ({
                 {session.subject}
               </h2>
               <p className="text-sm text-slate-400 mt-1.5 leading-relaxed">
-                Scan the QR code with your phone camera or Student Scanner tab to log your{" "}
-                <span className="text-indigo-300 font-semibold">Time In</span> or{" "}
-                <span className="text-indigo-300 font-semibold">Time Out</span>.
+                {displayMode === "attendance_qr" ? (
+                  <>
+                    Scan the rotating QR code with your phone camera or Student Scanner app to log your{" "}
+                    <span className="text-indigo-300 font-semibold">Time In</span> or{" "}
+                    <span className="text-indigo-300 font-semibold">Time Out</span>.
+                  </>
+                ) : (
+                  <>
+                    Students who don't have the scanner open can scan this QR code with their default camera app to launch the{" "}
+                    <span className="text-emerald-300 font-semibold">Student Scanner Portal</span> on their phone.
+                  </>
+                )}
               </p>
             </div>
 
@@ -222,9 +316,9 @@ export const QrProjectorModal: React.FC<QrProjectorModalProps> = ({
                 <span>Teacher Projection Tips:</span>
               </div>
               <ul className="list-disc list-inside space-y-1.5 text-slate-400 pl-1">
+                <li>Students can open the scanner on their own phone using the <strong>Student App Link</strong> tab above.</li>
                 <li>Dynamic QR automatically refreshes token every 30 seconds to prevent forwarding photos.</li>
-                <li>Keep this window projected on the classroom screen during entry and dismissal.</li>
-                <li>Records are cryptographically hashed and mirrored to AWS DynamoDB & S3.</li>
+                <li>Records are cryptographically hashed and mirrored to LocalStack / AWS DynamoDB & S3.</li>
               </ul>
             </div>
           </div>
@@ -234,7 +328,7 @@ export const QrProjectorModal: React.FC<QrProjectorModalProps> = ({
         <div className="px-6 sm:px-8 py-4 bg-slate-950/80 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-400">
           <div className="flex items-center space-x-2">
             <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-            <span>AWS Enterprise Database & S3 Cold Archive Persistence Active</span>
+            <span>LocalStack & AWS Cloud Storage Sync Active</span>
           </div>
           <button
             onClick={fetchAndRenderQr}

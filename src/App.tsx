@@ -4,18 +4,54 @@ import { TeacherDashboard } from "./components/TeacherDashboard";
 import { StudentScanner } from "./components/StudentScanner";
 import { AwsRecordVault } from "./components/AwsRecordVault";
 import { QrProjectorModal } from "./components/QrProjectorModal";
+import { StudentShareModal } from "./components/StudentShareModal";
 import { Session, AttendanceRecord, Student, AwsVaultStatus } from "./types";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, ExternalLink, ShieldCheck, Smartphone, GraduationCap, ArrowRight } from "lucide-react";
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<"teacher" | "student" | "aws">("teacher");
+  // Detect initial mode from URL (e.g. ?app=student, ?role=student, ?portal=student)
+  const getInitialAppMode = (): "teacher" | "student" => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const app = params.get("app") || params.get("role") || params.get("portal");
+      if (app === "student") return "student";
+      return "teacher";
+    } catch {
+      return "teacher";
+    }
+  };
+
+  const [appMode, setAppMode] = useState<"teacher" | "student">(getInitialAppMode());
+  const [activeTab, setActiveTab] = useState<"teacher" | "student" | "aws">(
+    getInitialAppMode() === "student" ? "student" : "teacher"
+  );
+
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [awsStatus, setAwsStatus] = useState<AwsVaultStatus | null>(null);
   const [isProjectorOpen, setIsProjectorOpen] = useState<boolean>(false);
+  const [isStudentShareOpen, setIsStudentShareOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Sync mode changes to URL without reloading page
+  const handleSetAppMode = (mode: "teacher" | "student") => {
+    setAppMode(mode);
+    if (mode === "student") {
+      setActiveTab("student");
+    } else {
+      setActiveTab("teacher");
+    }
+
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("app", mode);
+      window.history.pushState({}, "", url.toString());
+    } catch (e) {
+      console.error("Failed to update URL history:", e);
+    }
+  };
 
   // Fetch all initial data from backend
   const loadData = async () => {
@@ -41,7 +77,6 @@ export function App() {
       if (!activeSession && sessData && sessData.length > 0) {
         setActiveSession(sessData[0]);
       } else if (activeSession && sessData) {
-        // Keep updated session reference
         const updated = sessData.find((s: Session) => s.id === activeSession.id);
         if (updated) setActiveSession(updated);
       }
@@ -82,16 +117,19 @@ export function App() {
         <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-20" />
       </div>
 
-      {/* Top Navigation */}
+      {/* Top Navigation Bar */}
       <Navbar
+        appMode={appMode}
+        setAppMode={handleSetAppMode}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         activeSession={activeSession}
         awsStatus={awsStatus}
         onOpenProjector={() => setIsProjectorOpen(true)}
+        onOpenStudentShare={() => setIsStudentShareOpen(true)}
       />
 
-      {/* Main Body Canvas */}
+      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 relative z-10">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-28 space-y-4">
@@ -107,34 +145,42 @@ export function App() {
           </div>
         ) : (
           <>
-            {activeTab === "teacher" && (
-              <TeacherDashboard
-                sessions={sessions}
-                activeSession={activeSession}
-                setActiveSession={setActiveSession}
-                records={records}
-                students={students}
-                onOpenProjector={() => setIsProjectorOpen(true)}
-                onRefreshData={loadData}
-                onSyncAws={handleSyncAws}
-              />
+            {/* Student App Portal View */}
+            {appMode === "student" && (
+              <div className="space-y-4">
+                <StudentScanner
+                  sessions={sessions}
+                  students={students}
+                  records={records}
+                  onRefreshData={loadData}
+                />
+              </div>
             )}
 
-            {activeTab === "student" && (
-              <StudentScanner
-                sessions={sessions}
-                students={students}
-                records={records}
-                onRefreshData={loadData}
-              />
-            )}
+            {/* Teacher App Portal Views */}
+            {appMode === "teacher" && (
+              <>
+                {activeTab === "teacher" && (
+                  <TeacherDashboard
+                    sessions={sessions}
+                    activeSession={activeSession}
+                    setActiveSession={setActiveSession}
+                    records={records}
+                    students={students}
+                    onOpenProjector={() => setIsProjectorOpen(true)}
+                    onRefreshData={loadData}
+                    onSyncAws={handleSyncAws}
+                  />
+                )}
 
-            {activeTab === "aws" && (
-              <AwsRecordVault
-                awsStatus={awsStatus}
-                activeSession={activeSession}
-                onRefreshData={loadData}
-              />
+                {activeTab === "aws" && (
+                  <AwsRecordVault
+                    awsStatus={awsStatus}
+                    activeSession={activeSession}
+                    onRefreshData={loadData}
+                  />
+                )}
+              </>
             )}
           </>
         )}
@@ -146,6 +192,12 @@ export function App() {
         records={records}
         isOpen={isProjectorOpen}
         onClose={() => setIsProjectorOpen(false)}
+      />
+
+      {/* Share Student Mobile App Modal */}
+      <StudentShareModal
+        isOpen={isStudentShareOpen}
+        onClose={() => setIsStudentShareOpen(false)}
       />
     </div>
   );
